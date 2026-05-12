@@ -153,3 +153,75 @@ def test_compute_diff_uses_configured_column_names():
     fd = result["field_diffs"][0]
     assert fd["ben"] == "T1"
     assert fd["part"] == "P1"
+
+
+# --- group_by_ben tests ---
+
+def test_group_by_ben_splits_by_ben_value():
+    config = Config()
+    diff_result = {
+        "added": pd.DataFrame({"BEN": ["T1", "T2"], "Part Number": ["P1", "P2"], "Qty": [1, 2]}),
+        "removed": pd.DataFrame(columns=["BEN", "Part Number", "Qty"]),
+        "changed_b": pd.DataFrame(columns=["BEN", "Part Number", "Qty"]),
+        "changed_a": pd.DataFrame(columns=["BEN", "Part Number", "Qty"]),
+        "unchanged": pd.DataFrame(columns=["BEN", "Part Number", "Qty"]),
+        "field_diffs": [],
+    }
+    groups = group_by_ben(diff_result, config, tool_order=[])
+    assert set(groups.keys()) == {"T1", "T2"}
+    assert len(groups["T1"]["added"]) == 1
+    assert len(groups["T2"]["added"]) == 1
+
+
+def test_group_by_ben_respects_tool_order():
+    config = Config()
+    diff_result = {
+        "added": pd.DataFrame({"BEN": ["T3", "T1", "T2"], "Part Number": ["P1", "P2", "P3"], "Qty": [1, 2, 3]}),
+        "removed": pd.DataFrame(columns=["BEN", "Part Number", "Qty"]),
+        "changed_b": pd.DataFrame(columns=["BEN", "Part Number", "Qty"]),
+        "changed_a": pd.DataFrame(columns=["BEN", "Part Number", "Qty"]),
+        "unchanged": pd.DataFrame(columns=["BEN", "Part Number", "Qty"]),
+        "field_diffs": [],
+    }
+    groups = group_by_ben(diff_result, config, tool_order=["T2", "T3"])
+    keys = list(groups.keys())
+    assert keys[0] == "T2"
+    assert keys[1] == "T3"
+    assert keys[2] == "T1"
+
+
+def test_group_by_ben_falls_back_to_alphabetical():
+    config = Config()
+    diff_result = {
+        "added": pd.DataFrame({"BEN": ["ZEBRA", "ALPHA"], "Part Number": ["P1", "P2"], "Qty": [1, 2]}),
+        "removed": pd.DataFrame(columns=["BEN", "Part Number", "Qty"]),
+        "changed_b": pd.DataFrame(columns=["BEN", "Part Number", "Qty"]),
+        "changed_a": pd.DataFrame(columns=["BEN", "Part Number", "Qty"]),
+        "unchanged": pd.DataFrame(columns=["BEN", "Part Number", "Qty"]),
+        "field_diffs": [],
+    }
+    groups = group_by_ben(diff_result, config, tool_order=[])
+    keys = list(groups.keys())
+    assert keys[0] == "ALPHA"
+    assert keys[1] == "ZEBRA"
+
+
+def test_group_by_ben_changed_a_and_b_remain_row_aligned():
+    config = Config()
+    diff_result = {
+        "added": pd.DataFrame(columns=["BEN", "Part Number", "Qty"]),
+        "removed": pd.DataFrame(columns=["BEN", "Part Number", "Qty"]),
+        "changed_b": pd.DataFrame({"BEN": ["T1", "T1"], "Part Number": ["P1", "P2"], "Qty": [10, 20]}),
+        "changed_a": pd.DataFrame({"BEN": ["T1", "T1"], "Part Number": ["P1", "P2"], "Qty": [5, 15]}),
+        "unchanged": pd.DataFrame(columns=["BEN", "Part Number", "Qty"]),
+        "field_diffs": [
+            {"ben": "T1", "part": "P1", "field": "Qty", "old": 5, "new": 10},
+            {"ben": "T1", "part": "P2", "field": "Qty", "old": 15, "new": 20},
+        ],
+    }
+    groups = group_by_ben(diff_result, config, tool_order=[])
+    t1 = groups["T1"]
+    assert len(t1["changed_b"]) == 2
+    assert len(t1["changed_a"]) == 2
+    assert t1["changed_b"].iloc[0]["Qty"] == 10
+    assert t1["changed_a"].iloc[0]["Qty"] == 5

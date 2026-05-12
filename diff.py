@@ -147,6 +147,50 @@ def compute_diff(df_a: pd.DataFrame, df_b: pd.DataFrame, config: Config) -> Dict
     }
 
 
-def group_by_ben(*args, **kwargs):
-    """Stub for Task 6."""
-    raise NotImplementedError("group_by_ben not yet implemented")
+def group_by_ben(
+    diff_result: Dict[str, Any], config: Config, tool_order: List[str]
+) -> Dict[str, Dict[str, Any]]:
+    """Group diff result by BEN value. Returns dict sorted by tool_order then alpha."""
+    ben_col = config.ben_column
+
+    all_bens: set = set()
+    for key in ("added", "removed", "changed_b", "unchanged"):
+        df = diff_result[key]
+        if not df.empty and ben_col in df.columns:
+            all_bens.update(df[ben_col].astype(str).unique())
+
+    order_map = {ben: i for i, ben in enumerate(tool_order)}
+
+    def sort_key(ben: str) -> tuple:
+        if ben in order_map:
+            return (0, order_map[ben], ben)
+        return (1, 0, ben)
+
+    sorted_bens = sorted(all_bens, key=sort_key)
+
+    result: Dict[str, Dict[str, Any]] = {}
+    for ben in sorted_bens:
+        changed_b = diff_result["changed_b"]
+        if not changed_b.empty and ben_col in changed_b.columns:
+            b_mask = changed_b[ben_col].astype(str) == ben
+            filtered_b = changed_b[b_mask].reset_index(drop=True)
+            filtered_a = diff_result["changed_a"][b_mask].reset_index(drop=True)
+        else:
+            filtered_b = pd.DataFrame()
+            filtered_a = pd.DataFrame()
+
+        result[ben] = {
+            "added": _filter_by_ben(diff_result["added"], ben_col, ben),
+            "removed": _filter_by_ben(diff_result["removed"], ben_col, ben),
+            "changed_b": filtered_b,
+            "changed_a": filtered_a,
+            "unchanged": _filter_by_ben(diff_result["unchanged"], ben_col, ben),
+            "field_diffs": [d for d in diff_result["field_diffs"] if d["ben"] == ben],
+        }
+    return result
+
+
+def _filter_by_ben(df: pd.DataFrame, ben_col: str, ben: str) -> pd.DataFrame:
+    if df.empty:
+        return df
+    return df[df[ben_col].astype(str) == ben].reset_index(drop=True)
