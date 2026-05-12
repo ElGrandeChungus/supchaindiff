@@ -88,6 +88,8 @@ config.part_number_column = pn_col
 
 st.caption(f"Composite key (read-only): `{config.composite_key_columns}`")
 
+config.llm_enabled = st.toggle("Enable LLM (severity flags + executive summary)", value=config.llm_enabled)
+
 if not st.button("Run Diff", type="primary"):
     st.stop()
 
