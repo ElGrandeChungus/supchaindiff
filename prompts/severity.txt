@@ -1,0 +1,17 @@
+You are a supply-chain analyst. Given the following diff data for one tool, assign a severity level.
+
+Tool data (JSON):
+{{TOOL_JSON}}
+
+Respond with JSON only, matching this schema exactly:
+{
+  "tool_id": "<tool_id from input>",
+  "severity": "<HIGH|MEDIUM|LOW|NONE>",
+  "note": "<20 words or fewer explaining the severity>"
+}
+
+Severity definitions:
+- HIGH: Critical path impacts, major quantity or date changes on many parts
+- MEDIUM: Notable changes affecting a few key parts
+- LOW: Minor changes, small quantities
+- NONE: No changes of significance

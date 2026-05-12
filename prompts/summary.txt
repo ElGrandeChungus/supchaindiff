@@ -1,0 +1,11 @@
+You are a supply-chain analyst. Write an executive summary of the following supply-chain diff report.
+
+All tool summaries with severity ratings (JSON):
+{{SUMMARIES_JSON}}
+
+Write a plain-text executive summary of 300 words or fewer structured as:
+1. Overall assessment (1-2 sentences)
+2. Top notable changes (bullet points)
+3. Recommended attention items (bullet points)
+
+Do not include JSON or code in your response.
