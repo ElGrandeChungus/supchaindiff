@@ -48,3 +48,62 @@ def assign_sheet_names(bens: List[str]) -> Dict[str, str]:
             suffix = f"_{n}"
             result[ben] = base[: 31 - len(suffix)] + suffix
     return result
+
+
+def write_diff_index(
+    ws,
+    groups: Dict[str, Dict[str, Any]],
+    severities: Dict[str, Dict[str, Any]],
+    sheet_names: Dict[str, str],
+    skipped_bens: List[str],
+    col_asymmetry: List[str],
+    config: Config,
+) -> None:
+    """Write the DIFF_INDEX sheet to the given worksheet."""
+    aliases = ", ".join(config.ben_aliases)
+    ben_header = f"BEN (also known as: {aliases})" if aliases else "BEN"
+
+    headers = [
+        ben_header, "Sheet Name", "Added", "Removed", "Changed", "Unchanged",
+        "Status", "Severity", "LLM Note",
+    ]
+    for col_i, h in enumerate(headers, 1):
+        cell = ws.cell(row=1, column=col_i, value=h)
+        cell.font = Font(bold=True)
+
+    row = 2
+    for ben, group in groups.items():
+        sev_info = severities.get(ben, {"severity": "UNSCORED", "note": ""})
+        severity = sev_info.get("severity", "UNSCORED")
+        ws.cell(row=row, column=1, value=ben)
+        ws.cell(row=row, column=2, value=sheet_names.get(ben, ""))
+        ws.cell(row=row, column=3, value=len(group["added"]))
+        ws.cell(row=row, column=4, value=len(group["removed"]))
+        ws.cell(row=row, column=5, value=len(group["changed_b"]))
+        ws.cell(row=row, column=6, value=len(group["unchanged"]))
+        ws.cell(row=row, column=7, value="OK")
+        sev_cell = ws.cell(row=row, column=8, value=severity)
+        sev_cell.fill = _severity_fill(severity)
+        ws.cell(row=row, column=9, value=sev_info.get("note", ""))
+        row += 1
+
+    for ben in skipped_bens:
+        ws.cell(row=row, column=1, value=ben)
+        ws.cell(row=row, column=7, value="SKIPPED — DUPLICATE KEYS")
+        row += 1
+
+    ws.auto_filter.ref = f"A1:{get_column_letter(len(headers))}{row - 1}"
+
+    if col_asymmetry:
+        row += 1
+        note = f"Note: Column asymmetry detected — columns present in only one sheet: {', '.join(col_asymmetry)}"
+        ws.cell(row=row, column=1, value=note)
+
+
+def _severity_fill(severity: str) -> PatternFill:
+    return {
+        "HIGH": FILL_SEV_HIGH,
+        "MEDIUM": FILL_SEV_MEDIUM,
+        "LOW": FILL_SEV_LOW_NONE,
+        "NONE": FILL_SEV_LOW_NONE,
+    }.get(severity, FILL_SEV_UNSCORED)

@@ -51,3 +51,93 @@ def test_assign_sheet_names_maps_original_ben():
     mapping = assign_sheet_names(bens)
     assert "MY_TOOL" in mapping
     assert mapping["MY_TOOL"] == "DIFF_MY_TOOL"
+
+
+import pandas as pd
+from openpyxl import Workbook
+from output import write_diff_index
+from config import Config
+
+
+def _empty_df(config):
+    return pd.DataFrame(columns=[config.ben_column, config.part_number_column])
+
+
+def _make_severity_result(tool_id, severity="NONE", note=""):
+    return {"tool_id": tool_id, "severity": severity, "note": note}
+
+
+def test_diff_index_has_one_row_per_ben():
+    config = Config()
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "DIFF_INDEX"
+
+    groups = {
+        "T1": {"added": _empty_df(config), "removed": _empty_df(config),
+               "changed_b": _empty_df(config), "unchanged": _empty_df(config), "field_diffs": []},
+        "T2": {"added": _empty_df(config), "removed": _empty_df(config),
+               "changed_b": _empty_df(config), "unchanged": _empty_df(config), "field_diffs": []},
+    }
+    severities = {"T1": _make_severity_result("T1"), "T2": _make_severity_result("T2")}
+    sheet_names = {"T1": "DIFF_T1", "T2": "DIFF_T2"}
+
+    write_diff_index(ws, groups, severities, sheet_names, skipped_bens=[], col_asymmetry=[], config=config)
+
+    # Row 1 = header, rows 2+ = data
+    data_vals = [ws.cell(row=r, column=1).value for r in range(2, ws.max_row + 1)]
+    data_vals = [v for v in data_vals if v is not None]
+    assert len(data_vals) == 2
+
+
+def test_diff_index_header_uses_ben_alias_annotation():
+    config = Config()
+    wb = Workbook()
+    ws = wb.active
+
+    write_diff_index(ws, {}, {}, {}, skipped_bens=[], col_asymmetry=[], config=config)
+
+    header = ws.cell(row=1, column=1).value
+    assert "BEN" in header
+    assert "P1A" in header
+    assert "FCID" in header
+
+
+def test_diff_index_skipped_ben_shows_status():
+    config = Config()
+    wb = Workbook()
+    ws = wb.active
+
+    write_diff_index(ws, {}, {}, {}, skipped_bens=["BAD_TOOL"], col_asymmetry=[], config=config)
+
+    statuses = [ws.cell(row=r, column=7).value for r in range(2, ws.max_row + 1)]
+    assert any("SKIPPED" in str(s) for s in statuses if s)
+
+
+def test_diff_index_ok_rows_have_ok_status():
+    config = Config()
+    wb = Workbook()
+    ws = wb.active
+
+    groups = {
+        "T1": {"added": _empty_df(config), "removed": _empty_df(config),
+               "changed_b": _empty_df(config), "unchanged": _empty_df(config), "field_diffs": []},
+    }
+    severities = {"T1": _make_severity_result("T1", severity="HIGH")}
+    sheet_names = {"T1": "DIFF_T1"}
+
+    write_diff_index(ws, groups, severities, sheet_names, skipped_bens=[], col_asymmetry=[], config=config)
+
+    status_val = ws.cell(row=2, column=7).value
+    assert status_val == "OK"
+
+
+def test_diff_index_col_asymmetry_note_added():
+    config = Config()
+    wb = Workbook()
+    ws = wb.active
+
+    write_diff_index(ws, {}, {}, {}, skipped_bens=[], col_asymmetry=["WeirdCol"], config=config)
+
+    all_values = [ws.cell(row=r, column=1).value for r in range(1, ws.max_row + 1)]
+    assert any("WeirdCol" in str(v) for v in all_values if v)
