@@ -61,8 +61,22 @@ def _nan_equal(a: Any, b: Any) -> bool:
     return bool(a == b)
 
 
+def _to_serializable(v: Any) -> Any:
+    """Convert NaN/NaT/NA to None for JSON-safe serialization."""
+    try:
+        if pd.isna(v):
+            return None
+    except (TypeError, ValueError):
+        pass
+    return v
+
+
 def compute_diff(df_a: pd.DataFrame, df_b: pd.DataFrame, config: Config) -> Dict[str, Any]:
     """Classify all rows as added/removed/changed/unchanged.
+
+    Precondition: Both df_a and df_b must have unique composite key combinations.
+    If duplicate keys exist, call ingestion.find_duplicate_keys first and exclude
+    affected BEN groups before passing DataFrames to this function.
 
     Returns dict with keys:
         added (DataFrame): rows in Sheet B only
@@ -113,8 +127,8 @@ def compute_diff(df_a: pd.DataFrame, df_b: pd.DataFrame, config: Config) -> Dict
                         "ben": str(common_b.at[i, config.ben_column]),
                         "part": str(common_b.at[i, config.part_number_column]),
                         "field": col,
-                        "old": None if (isinstance(val_a, float) and pd.isna(val_a)) else val_a,
-                        "new": None if (isinstance(val_b, float) and pd.isna(val_b)) else val_b,
+                        "old": _to_serializable(val_a),
+                        "new": _to_serializable(val_b),
                     }
                 )
         if row_field_diffs:
