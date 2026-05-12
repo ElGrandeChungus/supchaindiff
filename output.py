@@ -15,15 +15,15 @@ logger = logging.getLogger(__name__)
 
 _PROHIBITED = re.compile(r"[\[\]:*?/\\]")
 
-# Colour fills
+# Colour fills (8-char ARGB: FF + 6-char RGB)
 FILL_ADDED = PatternFill("solid", fgColor="FFC6EFCE")
-FILL_REMOVED = PatternFill("solid", fgColor="FFC7CE")
-FILL_CHANGED_CURRENT = PatternFill("solid", fgColor="FFEB9C")
-FILL_CHANGED_PRIOR = PatternFill("solid", fgColor="FCE4D6")
-FILL_SEV_HIGH = PatternFill("solid", fgColor="FF0000")
-FILL_SEV_MEDIUM = PatternFill("solid", fgColor="FFBF00")
-FILL_SEV_LOW_NONE = PatternFill("solid", fgColor="00B050")
-FILL_SEV_UNSCORED = PatternFill("solid", fgColor="808080")
+FILL_REMOVED = PatternFill("solid", fgColor="FFFFC7CE")
+FILL_CHANGED_CURRENT = PatternFill("solid", fgColor="FFFFEB9C")
+FILL_CHANGED_PRIOR = PatternFill("solid", fgColor="FFFCE4D6")
+FILL_SEV_HIGH = PatternFill("solid", fgColor="FFFF0000")
+FILL_SEV_MEDIUM = PatternFill("solid", fgColor="FFFFBF00")
+FILL_SEV_LOW_NONE = PatternFill("solid", fgColor="FF00B050")
+FILL_SEV_UNSCORED = PatternFill("solid", fgColor="FF808080")
 
 
 def sanitize_ben_for_sheet(ben: str, prefix: str = "DIFF_") -> str:
