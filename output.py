@@ -300,8 +300,8 @@ def write_output_file(
         tool_ws = output_wb.create_sheet(sheet_name)
         write_tool_sheet(tool_ws, group, non_key_cols, config)
 
-    # 4. EXEC_SUMMARY sheet
-    exec_ws = output_wb.create_sheet(f"EXEC_SUMMARY_{date_a}_{date_b}")
+    # 4. EXEC_SUMMARY sheet (name truncated to Excel's 31-char limit)
+    exec_ws = output_wb.create_sheet(f"EXEC_SUMMARY_{date_a}_{date_b}"[:31])
     write_exec_summary(exec_ws, exec_summary, config, date_a, date_b)
 
     output_wb.save(output_filepath)

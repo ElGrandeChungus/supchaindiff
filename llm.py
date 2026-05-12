@@ -1,5 +1,6 @@
 import json
 import logging
+from pathlib import Path
 from typing import Any, Dict, List
 
 from openai import OpenAI
@@ -91,5 +92,6 @@ def build_tool_summaries(
 
 
 def _load_prompt(path: str) -> str:
-    with open(path, encoding="utf-8") as f:
+    resolved = Path(__file__).parent / path
+    with open(resolved, encoding="utf-8") as f:
         return f.read()
