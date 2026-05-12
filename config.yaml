@@ -1,0 +1,12 @@
+ben_column: "BEN"
+part_number_column: "Part Number"
+ben_aliases:
+  - "P1A"
+  - "FCID"
+exclude_columns: []
+tool_order: []
+llm_base_url: "http://localhost:11434/v1"
+llm_model: ""
+llm_api_key: "none"
+llm_timeout_seconds: 30
+llm_enabled: true
