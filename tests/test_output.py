@@ -141,3 +141,86 @@ def test_diff_index_col_asymmetry_note_added():
 
     all_values = [ws.cell(row=r, column=1).value for r in range(1, ws.max_row + 1)]
     assert any("WeirdCol" in str(v) for v in all_values if v)
+
+
+from output import write_tool_sheet
+
+
+def test_tool_sheet_has_four_section_headers():
+    config = Config()
+    wb = Workbook()
+    ws = wb.create_sheet("DIFF_T1")
+    group = {
+        "added": pd.DataFrame({"BEN": ["T1"], "Part Number": ["P_NEW"], "Qty": [5]}),
+        "removed": pd.DataFrame({"BEN": ["T1"], "Part Number": ["P_OLD"], "Qty": [3]}),
+        "changed_b": pd.DataFrame({"BEN": ["T1"], "Part Number": ["P1"], "Qty": [10]}),
+        "changed_a": pd.DataFrame({"BEN": ["T1"], "Part Number": ["P1"], "Qty": [5]}),
+        "unchanged": pd.DataFrame({"BEN": ["T1"], "Part Number": ["P2"], "Qty": [2]}),
+        "field_diffs": [{"ben": "T1", "part": "P1", "field": "Qty", "old": 5, "new": 10}],
+    }
+    non_key = ["Qty"]
+    write_tool_sheet(ws, group, non_key, config)
+    all_values = [ws.cell(row=r, column=1).value for r in range(1, ws.max_row + 1)]
+    assert "ADDED" in all_values
+    assert "REMOVED" in all_values
+    assert "CHANGED" in all_values
+    assert "UNCHANGED" in all_values
+
+
+def test_tool_sheet_unchanged_rows_have_outline_level_1():
+    config = Config()
+    wb = Workbook()
+    ws = wb.create_sheet("DIFF_T1")
+    group = {
+        "added": pd.DataFrame(columns=["BEN", "Part Number", "Qty"]),
+        "removed": pd.DataFrame(columns=["BEN", "Part Number", "Qty"]),
+        "changed_b": pd.DataFrame(columns=["BEN", "Part Number", "Qty"]),
+        "changed_a": pd.DataFrame(columns=["BEN", "Part Number", "Qty"]),
+        "unchanged": pd.DataFrame({"BEN": ["T1"], "Part Number": ["P1"], "Qty": [5]}),
+        "field_diffs": [],
+    }
+    write_tool_sheet(ws, group, ["Qty"], config)
+    hidden_rows = [r for r in range(1, ws.max_row + 2) if ws.row_dimensions[r].outline_level == 1]
+    assert len(hidden_rows) == 1
+
+
+def test_tool_sheet_changed_section_has_prior_columns():
+    config = Config()
+    wb = Workbook()
+    ws = wb.create_sheet("DIFF_T1")
+    group = {
+        "added": pd.DataFrame(columns=["BEN", "Part Number", "Qty"]),
+        "removed": pd.DataFrame(columns=["BEN", "Part Number", "Qty"]),
+        "changed_b": pd.DataFrame({"BEN": ["T1"], "Part Number": ["P1"], "Qty": [10]}),
+        "changed_a": pd.DataFrame({"BEN": ["T1"], "Part Number": ["P1"], "Qty": [5]}),
+        "unchanged": pd.DataFrame(columns=["BEN", "Part Number", "Qty"]),
+        "field_diffs": [{"ben": "T1", "part": "P1", "field": "Qty", "old": 5, "new": 10}],
+    }
+    write_tool_sheet(ws, group, ["Qty"], config)
+    all_cell_values = set()
+    for row in ws.iter_rows():
+        for cell in row:
+            all_cell_values.add(cell.value)
+    assert "Qty_prior" in all_cell_values
+
+
+def test_tool_sheet_added_rows_have_green_fill():
+    config = Config()
+    wb = Workbook()
+    ws = wb.create_sheet("DIFF_T1")
+    group = {
+        "added": pd.DataFrame({"BEN": ["T1"], "Part Number": ["P_NEW"], "Qty": [5]}),
+        "removed": pd.DataFrame(columns=["BEN", "Part Number", "Qty"]),
+        "changed_b": pd.DataFrame(columns=["BEN", "Part Number", "Qty"]),
+        "changed_a": pd.DataFrame(columns=["BEN", "Part Number", "Qty"]),
+        "unchanged": pd.DataFrame(columns=["BEN", "Part Number", "Qty"]),
+        "field_diffs": [],
+    }
+    write_tool_sheet(ws, group, ["Qty"], config)
+    # Find cells with green fill (ADDED fill color)
+    green_cells = []
+    for row in ws.iter_rows():
+        for cell in row:
+            if cell.fill and cell.fill.fgColor and cell.fill.fgColor.rgb == "FFC6EFCE":
+                green_cells.append(cell)
+    assert len(green_cells) > 0

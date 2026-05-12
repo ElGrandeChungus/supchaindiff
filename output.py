@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 _PROHIBITED = re.compile(r"[\[\]:*?/\\]")
 
 # Colour fills
-FILL_ADDED = PatternFill("solid", fgColor="C6EFCE")
+FILL_ADDED = PatternFill("solid", fgColor="FFC6EFCE")
 FILL_REMOVED = PatternFill("solid", fgColor="FFC7CE")
 FILL_CHANGED_CURRENT = PatternFill("solid", fgColor="FFEB9C")
 FILL_CHANGED_PRIOR = PatternFill("solid", fgColor="FCE4D6")
@@ -107,3 +107,110 @@ def _severity_fill(severity: str) -> PatternFill:
         "LOW": FILL_SEV_LOW_NONE,
         "NONE": FILL_SEV_LOW_NONE,
     }.get(severity, FILL_SEV_UNSCORED)
+
+
+def write_tool_sheet(
+    ws,
+    group: Dict[str, Any],
+    non_key_cols: List[str],
+    config: Config,
+) -> None:
+    """Write one per-tool diff sheet with four sections: ADDED, REMOVED, CHANGED, UNCHANGED."""
+    keys = config.composite_key_columns
+    all_cols = keys + non_key_cols
+    prior_headers = [f"{c}_prior" for c in non_key_cols]
+
+    # Build lookup: (ben_str, part_str) -> set of changed field names
+    changed_lookup: Dict[Tuple, set] = {}
+    for fd in group["field_diffs"]:
+        k = (str(fd["ben"]), str(fd["part"]))
+        changed_lookup.setdefault(k, set()).add(fd["field"])
+
+    current_row = 1
+
+    # Section 1: ADDED
+    current_row = _write_section_header(ws, current_row, "ADDED")
+    current_row = _write_col_headers(ws, current_row, all_cols)
+    for _, data_row in group["added"].iterrows():
+        for col_i, col in enumerate(all_cols, 1):
+            cell = ws.cell(row=current_row, column=col_i, value=_safe_val(data_row.get(col)))
+            cell.fill = FILL_ADDED
+        ws.row_dimensions[current_row].outline_level = 0
+        current_row += 1
+
+    # Section 2: REMOVED
+    current_row = _write_section_header(ws, current_row, "REMOVED")
+    current_row = _write_col_headers(ws, current_row, all_cols)
+    for _, data_row in group["removed"].iterrows():
+        for col_i, col in enumerate(all_cols, 1):
+            cell = ws.cell(row=current_row, column=col_i, value=_safe_val(data_row.get(col)))
+            cell.fill = FILL_REMOVED
+        ws.row_dimensions[current_row].outline_level = 0
+        current_row += 1
+
+    # Section 3: CHANGED
+    full_changed_headers = all_cols + prior_headers
+    current_row = _write_section_header(ws, current_row, "CHANGED")
+    current_row = _write_col_headers(ws, current_row, full_changed_headers)
+    changed_b = group["changed_b"]
+    changed_a = group["changed_a"]
+    for i in range(len(changed_b)):
+        row_b = changed_b.iloc[i]
+        row_a = changed_a.iloc[i] if not changed_a.empty else None
+        ben_val = str(row_b.get(config.ben_column, ""))
+        part_val = str(row_b.get(config.part_number_column, ""))
+        row_changed_fields = changed_lookup.get((ben_val, part_val), set())
+
+        # Group 1: current values (Sheet B)
+        for col_i, col in enumerate(all_cols, 1):
+            cell = ws.cell(row=current_row, column=col_i, value=_safe_val(row_b.get(col)))
+            if col in row_changed_fields:
+                cell.fill = FILL_CHANGED_CURRENT
+
+        # Group 2: prior values (_prior columns)
+        for j, col in enumerate(non_key_cols):
+            col_i = len(all_cols) + j + 1
+            if col in row_changed_fields and row_a is not None:
+                prior_val = _safe_val(row_a.get(col))
+                cell = ws.cell(row=current_row, column=col_i, value=prior_val)
+                cell.fill = FILL_CHANGED_PRIOR
+            else:
+                ws.cell(row=current_row, column=col_i, value="")
+
+        ws.row_dimensions[current_row].outline_level = 0
+        current_row += 1
+
+    # Section 4: UNCHANGED (collapsed by default)
+    current_row = _write_section_header(ws, current_row, "UNCHANGED")
+    current_row = _write_col_headers(ws, current_row, all_cols)
+    for _, data_row in group["unchanged"].iterrows():
+        for col_i, col in enumerate(all_cols, 1):
+            ws.cell(row=current_row, column=col_i, value=_safe_val(data_row.get(col)))
+        dim = ws.row_dimensions[current_row]
+        dim.outline_level = 1
+        dim.hidden = True
+        current_row += 1
+
+
+def _write_section_header(ws, row: int, label: str) -> int:
+    cell = ws.cell(row=row, column=1, value=label)
+    cell.font = Font(bold=True)
+    ws.row_dimensions[row].outline_level = 0
+    return row + 1
+
+
+def _write_col_headers(ws, row: int, headers: List[str]) -> int:
+    for col_i, h in enumerate(headers, 1):
+        ws.cell(row=row, column=col_i, value=h)
+    ws.row_dimensions[row].outline_level = 0
+    return row + 1
+
+
+def _safe_val(v: Any) -> Any:
+    """Convert NaN/NaT to None for openpyxl cell writing."""
+    try:
+        if pd.isna(v):
+            return None
+    except (TypeError, ValueError):
+        pass
+    return v
